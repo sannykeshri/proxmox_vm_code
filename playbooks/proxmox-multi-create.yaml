@@ -1,0 +1,106 @@
+---
+- name: Create/Configure/Start multiple Proxmox VMs from template
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - ../vars/proxmox.yml
+
+  collections:
+    - community.general
+
+  tasks:
+    - name: Ensure target pool exists
+      community.general.proxmox_pool:
+        api_host: "{{ api_host }}"
+        api_token_id: "{{ api_token_id }}"
+        api_token_secret: "{{ api_token_secret }}"
+        validate_certs: "{{ verify_ssl }}"
+        poolid: "{{ proxmox_pool }}"
+        state: present
+
+    - name: Clone VMs from template (idempotent)
+      community.general.proxmox_kvm:
+        api_host: "{{ api_host }}"
+        api_token_id: "{{ api_token_id }}"
+        api_token_secret: "{{ api_token_secret }}"
+        validate_certs: "{{ verify_ssl }}"
+        node: "{{ proxmox_node }}"
+        name: "{{ item.name }}"
+        pool: "{{ proxmox_pool }}"
+        clone: "{{ proxmox_template_vmid }}"
+        full: true
+        scsihw: virtio-scsi-pci
+        virtio0: "{{ proxmox_storage }}:{{ (item.disk_gb | default(default_disk_gb)) }}G"
+        net0: "virtio,bridge={{ default_bridge }}"
+        cores: "{{ item.cores | default(default_cores) }}"
+        memory: "{{ item.memory | default(default_memory) }}"
+        agent: 1
+        onboot: 1
+        state: present
+      loop: "{{ vms }}"
+      register: clone_results
+
+    - name: Configure cloud-init for each VM
+      community.general.proxmox_kvm:
+        api_host: "{{ api_host }}"
+        api_token_id: "{{ api_token_id }}"
+        api_token_secret: "{{ api_token_secret }}"
+        validate_certs: "{{ verify_ssl }}"
+        node: "{{ proxmox_node }}"
+        name: "{{ item.name }}"
+        ciuser: "{{ item.ci_user | default(ci_user) }}"
+        sshkeys: "{{ item.ci_ssh_authorized_keys | default(ci_ssh_authorized_keys) }}"
+        # Static IP or DHCP
+        ipconfig0: >-
+          {% if item.dhcp | default(false) %}
+          ip=dhcp
+          {% else %}
+          ip={{ item.ip }},gw={{ item.gateway | default(ci_gateway) }}
+          {% endif %}
+        nameserver: "{{ item.nameserver | default(ci_dns) }}"
+        searchdomain: "{{ item.searchdomain | default(ci_search) }}"
+        citype: nocloud
+        update: true
+      loop: "{{ vms }}"
+
+    - name: Start VMs
+      community.general.proxmox_kvm:
+        api_host: "{{ api_host }}"
+        api_token_id: "{{ api_token_id }}"
+        api_token_secret: "{{ api_token_secret }}"
+        validate_certs: "{{ verify_ssl }}"
+        node: "{{ proxmox_node }}"
+        name: "{{ item.name }}"
+        state: started
+      loop: "{{ vms }}"
+
+    # Optional: wait a bit for guest-agent/cloud-init to settle
+    - name: Pause for first boot
+      pause:
+        seconds: 15
+
+    # Optional: fetch VMIDs for later use (facts, IPs, etc.)
+    - name: Lookup VMID by name
+      vars:
+        vmid_lookup: >-
+          {{ query('community.general.proxmox', 'vmid',
+                    name=item.name,
+                    node=proxmox_node,
+                    api_host=api_host,
+                    api_token_id=api_token_id,
+                    api_token_secret=api_token_secret,
+                    validate_certs=verify_ssl) | first | int }}
+      set_fact:
+        "vmid_{{ item.name }}": "{{ vmid_lookup }}"
+      loop: "{{ vms }}"
+
+    # Optional: wait for SSH if static IP known; skip DHCP
+    - name: Wait for SSH (static-IP VMs only)
+      wait_for:
+        host: "{{ (item.ip | default('')) | regex_replace('/\\d+$','') }}"
+        port: 22
+        timeout: 600
+      loop: "{{ vms | selectattr('ip','defined') | list }}"
+      when: item.ip is defined

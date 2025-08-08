@@ -1,0 +1,41 @@
+# Proxmox connection (read from AAP env vars/credential)
+api_host: "https://192.168.1.11:8006"
+api_token_id: "root@pam!ansible_api_token"
+api_token_secret: "12c5c10e-215c-46bc-8160-29d461c0e5bb"
+verify_ssl: "yes"
+
+# Infra defaults
+proxmox_node: host1
+proxmox_pool: aap-vms
+proxmox_storage: data1        # destination storage (LVM-thin etc.)
+proxmox_template_vmid: 101          # your cloud-init template VMID
+
+# VM defaults
+default_cores: 2
+default_memory: 4096                 # MB
+default_disk_gb: 40
+default_bridge: vmbr0                # change if needed
+
+# Cloud-init defaults (override per-VM below)
+ci_user: sanny
+ci_ssh_authorized_keys: |
+  ssh-ed25519 AAAA...your_public_key
+ci_dns: 192.168.1.10
+ci_search: example.local
+ci_gateway: 192.168.1.1
+
+# Define VMs (mix static IP and DHCP examples)
+vms:
+  - name: app01
+    ip: 192.168.1.101/24
+    cores: 2
+    memory: 4096
+    disk_gb: 40
+  - name: app02
+    dhcp: true                      # if set, IP will be via DHCP
+    memory: 4096
+  - name: db01
+    ip: 192.168.1.102/24
+    cores: 4
+    memory: 8192
+    disk_gb: 40
