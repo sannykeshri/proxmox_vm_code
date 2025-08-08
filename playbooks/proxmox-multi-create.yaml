@@ -11,14 +11,14 @@
     - community.general
 
   tasks:
-    - name: Ensure target pool exists
-      community.general.proxmox_pool:
-        api_host: "{{ api_host }}"
-        api_token_id: "{{ api_token_id }}"
-        api_token_secret: "{{ api_token_secret }}"
-        validate_certs: "{{ verify_ssl }}"
-        poolid: "{{ proxmox_pool }}"
-        state: present
+#    - name: Ensure target pool exists
+#      community.general.proxmox_pool:
+#        api_host: "{{ api_host }}"
+#        api_token_id: "{{ api_token_id }}"
+#        api_token_secret: "{{ api_token_secret }}"
+#        validate_certs: "{{ verify_ssl }}"
+#        poolid: "{{ proxmox_pool }}"
+#        state: present
 
     - name: Clone VMs from template (idempotent)
       community.general.proxmox_kvm:
