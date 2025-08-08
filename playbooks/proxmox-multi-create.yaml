@@ -12,7 +12,7 @@
 
   tasks:
     - name: Ensure target pool exists
-      community.general.proxmox_pool:
+      proxmox_pool:
         api_host: "{{ api_host }}"
         api_token_id: "{{ api_token_id }}"
         api_token_secret: "{{ api_token_secret }}"
@@ -21,7 +21,7 @@
         state: present
 
     - name: Clone VMs from template (idempotent)
-      community.general.proxmox_kvm:
+      proxmox_kvm:
         api_host: "{{ api_host }}"
         api_token_id: "{{ api_token_id }}"
         api_token_secret: "{{ api_token_secret }}"
@@ -43,7 +43,7 @@
       register: clone_results
 
     - name: Configure cloud-init for each VM
-      community.general.proxmox_kvm:
+      proxmox_kvm:
         api_host: "{{ api_host }}"
         api_token_id: "{{ api_token_id }}"
         api_token_secret: "{{ api_token_secret }}"
@@ -66,7 +66,7 @@
       loop: "{{ vms }}"
 
     - name: Start VMs
-      community.general.proxmox_kvm:
+      proxmox_kvm:
         api_host: "{{ api_host }}"
         api_token_id: "{{ api_token_id }}"
         api_token_secret: "{{ api_token_secret }}"
